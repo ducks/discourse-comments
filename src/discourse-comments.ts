@@ -10,6 +10,8 @@
  *   </discourse-comments>
  */
 
+import init, { WasmDiscourseClient } from '../wasm/discourse_api_rs.js';
+
 class DiscourseComments extends HTMLElement {
   private shadow: ShadowRoot;
   private discourseUrl: string = '';
@@ -118,28 +120,58 @@ class DiscourseComments extends HTMLElement {
 
   private async loadComments() {
     try {
-      // TODO: Initialize WASM client and fetch comments
-      // For now, just show placeholder
+      await init();
+
+      const client = new WasmDiscourseClient(this.discourseUrl);
+      const topicData = await client.getTopic(BigInt(this.topicId));
+
       const container = this.shadow.querySelector('.comments-container');
-      if (container) {
-        container.innerHTML = `
-          <div class="comments-header">
-            <h2 class="comments-title">Comments</h2>
-          </div>
-          <div class="comment">
-            <div>
-              <span class="comment-author">Example User</span>
-              <span class="comment-date">2 hours ago</span>
+      if (!container) return;
+
+      let commentsHtml = `
+        <div class="comments-header">
+          <h2 class="comments-title">${topicData.title}</h2>
+        </div>
+      `;
+
+      if (topicData.post_stream && topicData.post_stream.posts) {
+        for (const post of topicData.post_stream.posts) {
+          const date = new Date(post.created_at);
+          const relativeTime = this.formatRelativeTime(date);
+
+          commentsHtml += `
+            <div class="comment">
+              <div>
+                <span class="comment-author">${post.username}</span>
+                <span class="comment-date">${relativeTime}</span>
+              </div>
+              <div class="comment-content">
+                ${post.cooked}
+              </div>
             </div>
-            <div class="comment-content">
-              This is a placeholder comment. WASM integration coming soon!
-            </div>
-          </div>
-        `;
+          `;
+        }
       }
+
+      container.innerHTML = commentsHtml;
     } catch (error) {
       this.showError(error instanceof Error ? error.message : 'Failed to load comments');
     }
+  }
+
+  private formatRelativeTime(date: Date): string {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 30) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+
+    return date.toLocaleDateString();
   }
 
   private showError(message: string) {
