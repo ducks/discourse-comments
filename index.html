@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discourse Comments Demo</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+    }
+    .demo-container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <h1>Discourse Comments Demo</h1>
+    <p>This is a demonstration of the Discourse embedded comments web component.</p>
+
+    <discourse-comments
+      discourse-url="https://cdckduckstest0.discourse.group"
+      topic-id="17">
+    </discourse-comments>
+  </div>
+
+  <script type="module" src="./dist/index.js"></script>
+</body>
+</html>
