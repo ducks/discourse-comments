@@ -5,6 +5,9 @@ pkgs.mkShell {
     nodejs_22
     typescript
     python3
+    wasm-pack
+    cargo
+    rustc
   ];
 
   shellHook = ''
