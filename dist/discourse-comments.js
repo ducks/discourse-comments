@@ -78,9 +78,12 @@ class DiscourseComments extends HTMLElement {
                 console.log('Found private key, attempting to decrypt payload...');
                 console.log('Payload length:', payload.length);
                 console.log('Payload (first 100 chars):', payload.substring(0, 100));
+                console.log('Private key PEM (first 100 chars):', privateKeyPem.substring(0, 100));
                 // Import private key
                 const privateKey = await this.importPrivateKey(privateKeyPem);
                 console.log('Private key imported successfully');
+                console.log('Private key algorithm:', privateKey.algorithm.name);
+                console.log('Private key hash:', privateKey.algorithm.hash?.name);
                 // Decode and decrypt the payload (decrypt FIRST, then parse JSON)
                 // Strip whitespace from base64 (Discourse may include newlines)
                 const cleanPayload = payload.replace(/\s/g, '');
@@ -108,7 +111,7 @@ class DiscourseComments extends HTMLElement {
         }
     }
     async generateKeyPair() {
-        // Use SHA-1 for RSA-OAEP (Discourse default)
+        // Use SHA-1 for RSA-OAEP (OpenSSL default used by Discourse)
         const keyPair = await window.crypto.subtle.generateKey({
             name: 'RSA-OAEP',
             modulusLength: 2048,
@@ -127,7 +130,7 @@ class DiscourseComments extends HTMLElement {
             .replace('-----END PRIVATE KEY-----', '')
             .replace(/\s/g, '');
         const binaryData = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
-        // Use SHA-1 for RSA-OAEP (Discourse default)
+        // Use SHA-1 for RSA-OAEP (OpenSSL default used by Discourse)
         return await window.crypto.subtle.importKey('pkcs8', binaryData, { name: 'RSA-OAEP', hash: 'SHA-1' }, true, ['decrypt']);
     }
     arrayBufferToPem(buffer, label) {
@@ -140,7 +143,9 @@ class DiscourseComments extends HTMLElement {
             // Generate key pair
             const { publicKey, privateKey } = await this.generateKeyPair();
             // Store private key temporarily (use localStorage to survive OAuth redirect)
+            console.log('Storing private key (first 100 chars):', privateKey.substring(0, 100));
             localStorage.setItem('discourse-comments-private-key-temp', privateKey);
+            console.log('Private key stored in localStorage');
             const authUrl = new URL('/user-api-key/new', this.discourseUrl);
             const currentUrl = new URL(window.location.href);
             currentUrl.searchParams.delete('payload');
