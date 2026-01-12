@@ -10,6 +10,7 @@
  *     client-id="discourse-comments">
  *   </discourse-comments>
  */
+// @ts-expect-error - WASM module doesn't have type definitions
 import init, { WasmDiscourseClient } from '../wasm/discourse_api_rs.js';
 class DiscourseComments extends HTMLElement {
     constructor() {
@@ -19,6 +20,7 @@ class DiscourseComments extends HTMLElement {
         this.clientId = 'discourse-comments';
         this.userApiKey = null;
         this.client = null;
+        this.isLoading = false;
         this.shadow = this.attachShadow({ mode: 'open' });
     }
     static get observedAttributes() {
@@ -67,21 +69,36 @@ class DiscourseComments extends HTMLElement {
         const payload = params.get('payload');
         if (payload) {
             try {
-                const data = JSON.parse(atob(payload));
-                // Get stored private key
-                const privateKeyPem = sessionStorage.getItem('discourse-comments-private-key');
-                if (!privateKeyPem || !data.key) {
-                    throw new Error('Missing private key or encrypted API key');
+                // Get stored private key (use localStorage instead of sessionStorage to survive OAuth redirect)
+                const privateKeyPem = localStorage.getItem('discourse-comments-private-key-temp');
+                if (!privateKeyPem) {
+                    console.error('No private key in localStorage');
+                    throw new Error('Missing private key - did you reload the page during OAuth flow?');
                 }
+                console.log('Found private key, attempting to decrypt payload...');
+                console.log('Payload length:', payload.length);
+                console.log('Payload (first 100 chars):', payload.substring(0, 100));
                 // Import private key
                 const privateKey = await this.importPrivateKey(privateKeyPem);
-                // Decrypt the API key
-                const encryptedKey = Uint8Array.from(atob(data.key), c => c.charCodeAt(0));
-                const decryptedKey = await window.crypto.subtle.decrypt({ name: 'RSA-OAEP' }, privateKey, encryptedKey);
-                const apiKey = new TextDecoder().decode(decryptedKey);
-                this.saveApiKey(apiKey);
+                console.log('Private key imported successfully');
+                // Decode and decrypt the payload (decrypt FIRST, then parse JSON)
+                // Strip whitespace from base64 (Discourse may include newlines)
+                const cleanPayload = payload.replace(/\s/g, '');
+                console.log('Clean payload length:', cleanPayload.length);
+                const encryptedData = Uint8Array.from(atob(cleanPayload), c => c.charCodeAt(0));
+                console.log('Encrypted data length:', encryptedData.length);
+                const decryptedData = await window.crypto.subtle.decrypt({ name: 'RSA-OAEP' }, privateKey, encryptedData);
+                console.log('Decryption succeeded!');
+                const jsonString = new TextDecoder().decode(decryptedData);
+                const data = JSON.parse(jsonString);
+                // Extract the API key
+                if (!data.key) {
+                    throw new Error('No API key in decrypted payload');
+                }
+                console.log('Successfully decrypted API key!');
+                this.saveApiKey(data.key);
                 // Clean up
-                sessionStorage.removeItem('discourse-comments-private-key');
+                localStorage.removeItem('discourse-comments-private-key-temp');
                 window.history.replaceState({}, '', window.location.pathname);
             }
             catch (error) {
@@ -91,11 +108,12 @@ class DiscourseComments extends HTMLElement {
         }
     }
     async generateKeyPair() {
+        // Use SHA-1 for RSA-OAEP (Discourse default)
         const keyPair = await window.crypto.subtle.generateKey({
             name: 'RSA-OAEP',
             modulusLength: 2048,
             publicExponent: new Uint8Array([1, 0, 1]),
-            hash: 'SHA-256',
+            hash: 'SHA-1',
         }, true, ['encrypt', 'decrypt']);
         const publicKeyData = await window.crypto.subtle.exportKey('spki', keyPair.publicKey);
         const privateKeyData = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
@@ -109,7 +127,8 @@ class DiscourseComments extends HTMLElement {
             .replace('-----END PRIVATE KEY-----', '')
             .replace(/\s/g, '');
         const binaryData = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
-        return await window.crypto.subtle.importKey('pkcs8', binaryData, { name: 'RSA-OAEP', hash: 'SHA-256' }, true, ['decrypt']);
+        // Use SHA-1 for RSA-OAEP (Discourse default)
+        return await window.crypto.subtle.importKey('pkcs8', binaryData, { name: 'RSA-OAEP', hash: 'SHA-1' }, true, ['decrypt']);
     }
     arrayBufferToPem(buffer, label) {
         const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
@@ -120,24 +139,29 @@ class DiscourseComments extends HTMLElement {
         try {
             // Generate key pair
             const { publicKey, privateKey } = await this.generateKeyPair();
-            // Store private key temporarily
-            sessionStorage.setItem('discourse-comments-private-key', privateKey);
+            // Store private key temporarily (use localStorage to survive OAuth redirect)
+            localStorage.setItem('discourse-comments-private-key-temp', privateKey);
             const authUrl = new URL('/user-api-key/new', this.discourseUrl);
             const currentUrl = new URL(window.location.href);
             currentUrl.searchParams.delete('payload');
             // Generate random nonce
-            const nonce = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            const nonce = Math.random().toString(36).substring(2, 15) +
+                Math.random().toString(36).substring(2, 15);
             const params = {
                 application_name: this.clientId,
                 client_id: this.clientId,
                 scopes: 'read,write',
                 nonce: nonce,
                 public_key: publicKey,
-                redirect_uri: currentUrl.toString(),
+                auth_redirect: currentUrl.toString(), // Use auth_redirect, not redirect_uri
+                padding: 'oaep',
             };
+            console.log('OAuth params:', params);
+            console.log('Public key (first 100 chars):', publicKey.substring(0, 100));
             Object.entries(params).forEach(([key, value]) => {
                 authUrl.searchParams.set(key, value);
             });
+            console.log('Redirecting to:', authUrl.toString().substring(0, 200) + '...');
             window.location.href = authUrl.toString();
         }
         catch (error) {
@@ -242,29 +266,9 @@ class DiscourseComments extends HTMLElement {
           background: #006699;
         }
 
-        .comment-form {
-          margin-bottom: 20px;
-          padding: 15px;
-          background: #f9f9f9;
-          border-radius: 4px;
-        }
-
-        .comment-form textarea {
-          width: 100%;
-          min-height: 100px;
-          padding: 10px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          font-family: inherit;
-          font-size: 14px;
-          resize: vertical;
-          box-sizing: border-box;
-        }
-
-        .comment-form-actions {
-          margin-top: 10px;
-          display: flex;
-          gap: 10px;
+        .btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         .comment {
@@ -288,6 +292,31 @@ class DiscourseComments extends HTMLElement {
           line-height: 1.6;
         }
 
+        .comment-form {
+          margin: 20px 0;
+          padding: 15px;
+          background: #f8f9fa;
+          border-radius: 4px;
+        }
+
+        .comment-form textarea {
+          width: 100%;
+          min-height: 100px;
+          padding: 10px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          font-family: inherit;
+          font-size: 14px;
+          resize: vertical;
+          box-sizing: border-box;
+        }
+
+        .comment-form-actions {
+          margin-top: 10px;
+          display: flex;
+          gap: 10px;
+        }
+
         .loading {
           text-align: center;
           padding: 40px;
@@ -308,24 +337,17 @@ class DiscourseComments extends HTMLElement {
           border-radius: 4px;
           padding: 15px;
           color: #3c3;
-          margin-bottom: 20px;
+          margin-bottom: 15px;
         }
       </style>
 
       <div class="comments-container">
         <div class="comments-header">
           <h2 class="comments-title">Comments</h2>
-          <div class="auth-section">
-            ${this.userApiKey
-            ? '<button class="btn" id="logout-btn">Logout</button>'
-            : `<button class="btn btn-primary" id="login-btn">Login to Comment</button>
-                 <button class="btn" id="manual-key-btn">Manual Key Entry</button>`}
-          </div>
         </div>
         <div class="loading">Loading comments...</div>
       </div>
     `;
-        // Attach event listeners
         const loginBtn = this.shadow.getElementById('login-btn');
         if (loginBtn) {
             loginBtn.addEventListener('click', () => this.initiateLogin());
@@ -343,6 +365,11 @@ class DiscourseComments extends HTMLElement {
         }
     }
     async loadComments() {
+        // Prevent concurrent calls (fixes WASM closure recursion error)
+        if (this.isLoading) {
+            return;
+        }
+        this.isLoading = true;
         try {
             await init();
             // Create appropriate client
@@ -420,6 +447,9 @@ class DiscourseComments extends HTMLElement {
         }
         catch (error) {
             this.showError(error instanceof Error ? error.message : 'Failed to load comments');
+        }
+        finally {
+            this.isLoading = false;
         }
     }
     async submitComment() {

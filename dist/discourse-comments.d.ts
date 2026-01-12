@@ -17,6 +17,7 @@ declare class DiscourseComments extends HTMLElement {
     private clientId;
     private userApiKey;
     private client;
+    private isLoading;
     constructor();
     static get observedAttributes(): string[];
     connectedCallback(): Promise<void>;

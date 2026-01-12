@@ -1,0 +1,31 @@
+{
+  "name": "discourse-api-rs",
+  "type": "module",
+  "collaborators": [
+    "Jake Goldsborough"
+  ],
+  "description": "Rust client for the Discourse API",
+  "version": "20251117.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ducks/discourse-api-rs"
+  },
+  "files": [
+    "discourse_api_rs_bg.wasm",
+    "discourse_api_rs.js",
+    "discourse_api_rs.d.ts"
+  ],
+  "main": "discourse_api_rs.js",
+  "types": "discourse_api_rs.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ],
+  "keywords": [
+    "discourse",
+    "api",
+    "client",
+    "forum",
+    "rust"
+  ]
+}
