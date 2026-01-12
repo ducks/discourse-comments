@@ -34,10 +34,6 @@ jobs:
           cp -r dist deploy/
           cp -r wasm deploy/
 
-          # Update demo to use meta.discourse.org for public demo
-          sed -i 's|discourse-url="[^"]*"|discourse-url="https://meta.discourse.org"|' deploy/index.html
-          sed -i 's|topic-id="[^"]*"|topic-id="1"|' deploy/index.html
-
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
