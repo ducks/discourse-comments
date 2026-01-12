@@ -82,22 +82,33 @@ class DiscourseComments extends HTMLElement {
 
     if (payload) {
       try {
-        // Get stored private key
-        const privateKeyPem = sessionStorage.getItem('discourse-comments-private-key');
+        // Get stored private key (use localStorage instead of sessionStorage to survive OAuth redirect)
+        const privateKeyPem = localStorage.getItem('discourse-comments-private-key-temp');
         if (!privateKeyPem) {
-          throw new Error('Missing private key');
+          console.error('No private key in localStorage');
+          throw new Error('Missing private key - did you reload the page during OAuth flow?');
         }
+
+        console.log('Found private key, attempting to decrypt payload...');
+        console.log('Payload length:', payload.length);
+        console.log('Payload (first 100 chars):', payload.substring(0, 100));
 
         // Import private key
         const privateKey = await this.importPrivateKey(privateKeyPem);
+        console.log('Private key imported successfully');
 
         // Decode and decrypt the payload (decrypt FIRST, then parse JSON)
-        const encryptedData = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
+        // Strip whitespace from base64 (Discourse may include newlines)
+        const cleanPayload = payload.replace(/\s/g, '');
+        console.log('Clean payload length:', cleanPayload.length);
+        const encryptedData = Uint8Array.from(atob(cleanPayload), c => c.charCodeAt(0));
+        console.log('Encrypted data length:', encryptedData.length);
         const decryptedData = await window.crypto.subtle.decrypt(
           { name: 'RSA-OAEP' },
           privateKey,
           encryptedData
         );
+        console.log('Decryption succeeded!');
         const jsonString = new TextDecoder().decode(decryptedData);
         const data = JSON.parse(jsonString);
 
@@ -105,10 +116,12 @@ class DiscourseComments extends HTMLElement {
         if (!data.key) {
           throw new Error('No API key in decrypted payload');
         }
+
+        console.log('Successfully decrypted API key!');
         this.saveApiKey(data.key);
 
         // Clean up
-        sessionStorage.removeItem('discourse-comments-private-key');
+        localStorage.removeItem('discourse-comments-private-key-temp');
         window.history.replaceState({}, '', window.location.pathname);
       } catch (error) {
         console.error('Failed to parse OAuth payload:', error);
@@ -168,8 +181,8 @@ class DiscourseComments extends HTMLElement {
       // Generate key pair
       const { publicKey, privateKey } = await this.generateKeyPair();
 
-      // Store private key temporarily
-      sessionStorage.setItem('discourse-comments-private-key', privateKey);
+      // Store private key temporarily (use localStorage to survive OAuth redirect)
+      localStorage.setItem('discourse-comments-private-key-temp', privateKey);
 
       const authUrl = new URL('/user-api-key/new', this.discourseUrl);
       const currentUrl = new URL(window.location.href);
@@ -189,10 +202,14 @@ class DiscourseComments extends HTMLElement {
         padding: 'oaep',
       };
 
+      console.log('OAuth params:', params);
+      console.log('Public key (first 100 chars):', publicKey.substring(0, 100));
+
       Object.entries(params).forEach(([key, value]) => {
         authUrl.searchParams.set(key, value);
       });
 
+      console.log('Redirecting to:', authUrl.toString().substring(0, 200) + '...');
       window.location.href = authUrl.toString();
     } catch (error) {
       console.error('Failed to initiate login:', error);
