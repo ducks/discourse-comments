@@ -10,16 +10,34 @@ WASM-powered embedded comment system for Discourse forums.
 - Shadow DOM isolation
 - TypeScript support
 
-## Development
+## Getting Started
+
+### 1. Build the component
 
 ```bash
+git clone https://github.com/ducks/discourse-comments.git
+cd discourse-comments
 npm install
 npm run build
 ```
 
-Open `demo.html` in a browser to see the component in action.
+### 2. Configure your Discourse instance
 
-## Usage
+In your Discourse admin panel (`/admin/site_settings`), configure these settings:
+
+- **`cors_origins`**: Add the domain where you'll host the component
+  (e.g., `https://your-blog.com`)
+- **`user_api_key_allowed_auth_redirects`**: Add the full URL pattern for OAuth
+  redirects (e.g., `https://your-blog.com/*`)
+
+### 3. Create a topic for comments
+
+Create a topic in your Discourse forum that will hold the comments. Note the
+topic ID from the URL (e.g., `/t/my-post-comments/123` has topic ID `123`).
+
+### 4. Add to your page
+
+Copy the `dist/` and `wasm/` folders to your site, then add:
 
 ```html
 <script type="module" src="./dist/index.js"></script>
@@ -29,6 +47,15 @@ Open `demo.html` in a browser to see the component in action.
   topic-id="123">
 </discourse-comments>
 ```
+
+## Development
+
+```bash
+npm install
+npm run build
+```
+
+Open `demo.html` in a browser to see the component in action.
 
 ## Requirements
 
