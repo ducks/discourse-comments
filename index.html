@@ -30,11 +30,12 @@
     <p>This is a demonstration of the Discourse embedded comments web component.</p>
 
     <discourse-comments
-      discourse-url="https://cdckduckstest0.discourse.group"
-      topic-id="17">
+      discourse-url="http://localhost:3000"
+      topic-id="7">
     </discourse-comments>
   </div>
 
-  <script type="module" src="./dist/index.js"></script>
+  <!-- Single file bundle with WASM inlined - no module loading required -->
+  <script src="./dist/discourse-comments.min.js"></script>
 </body>
 </html>
