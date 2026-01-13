@@ -3,15 +3,20 @@
   "version": "0.1.0",
   "description": "WASM-based embedded comment system for Discourse forums",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/discourse-comments.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run bundle",
+    "bundle": "node build.mjs",
     "dev": "tsc --watch",
     "serve": "python3 -m http.server 8080",
     "clean": "rm -rf dist"
   },
+  "dependencies": {
+    "discourse-api-rs": "^20260113.0.5"
+  },
   "devDependencies": {
+    "esbuild": "^0.24.0",
     "typescript": "^5.3.3"
   },
   "keywords": [

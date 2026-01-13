@@ -11,8 +11,8 @@
  *   </discourse-comments>
  */
 
-// @ts-expect-error - WASM module doesn't have type definitions
-import init, { WasmDiscourseClient } from '../wasm/discourse_api_rs.js';
+// @ts-ignore - WASM module types
+import init, { WasmDiscourseClient } from 'discourse-api-rs';
 
 class DiscourseComments extends HTMLElement {
   private shadow: ShadowRoot;
