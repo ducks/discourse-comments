@@ -1073,6 +1073,68 @@ ${lines.join("\n")}
           color: #3c3;
           margin-bottom: 15px;
         }
+
+        .comment-actions {
+          margin-top: 10px;
+          display: flex;
+          align-items: center;
+          gap: 15px;
+        }
+
+        .like-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          color: #919191;
+          font-size: 14px;
+          padding: 4px 8px;
+          border-radius: 4px;
+          transition: all 0.15s ease;
+        }
+
+        .like-btn:hover {
+          background: rgba(250, 108, 141, 0.15);
+          color: #fa6c8d;
+        }
+
+        .like-btn.liked {
+          color: #fa6c8d;
+        }
+
+        .like-btn.liked:hover {
+          background: rgba(250, 108, 141, 0.15);
+        }
+
+        .like-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .heart-icon {
+          width: 16px;
+          height: 16px;
+          fill: currentColor;
+        }
+
+        .like-count {
+          font-weight: 500;
+        }
+
+        .like-count-only {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          color: #fa6c8d;
+          font-size: 14px;
+        }
+
+        .like-count-only .heart-icon {
+          width: 16px;
+          height: 16px;
+        }
       </style>
 
       <div class="comments-container">
@@ -1140,14 +1202,27 @@ ${lines.join("\n")}
           for (const post of topicData.post_stream.posts) {
             const date = new Date(post.created_at);
             const relativeTime = this.formatRelativeTime(date);
+            const likeAction = post.actions_summary?.find((a) => a.id === 2);
+            const hasLiked = likeAction?.acted || false;
+            const likeCount = likeAction?.count || post.like_count || 0;
+            const heartOutline = `<svg class="heart-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 18.35l-1.45-1.32C3.4 12.36 0 9.28 0 5.5 0 2.42 2.42 0 5.5 0 7.24 0 8.91.81 10 2.09 11.09.81 12.76 0 14.5 0 17.58 0 20 2.42 20 5.5c0 3.78-3.4 6.86-8.55 11.54L10 18.35z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
+            const heartFilled = `<svg class="heart-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 18.35l-1.45-1.32C3.4 12.36 0 9.28 0 5.5 0 2.42 2.42 0 5.5 0 7.24 0 8.91.81 10 2.09 11.09.81 12.76 0 14.5 0 17.58 0 20 2.42 20 5.5c0 3.78-3.4 6.86-8.55 11.54L10 18.35z"/></svg>`;
             commentsHtml += `
-            <div class="comment">
+            <div class="comment" data-post-id="${post.id}">
               <div>
                 <span class="comment-author">${post.username}</span>
                 <span class="comment-date">${relativeTime}</span>
               </div>
               <div class="comment-content">
                 ${post.cooked}
+              </div>
+              <div class="comment-actions">
+                ${!post.yours ? `
+                  <button class="like-btn ${hasLiked ? "liked" : ""}" data-post-id="${post.id}" data-liked="${hasLiked}" ${!this.userApiKey ? 'disabled title="Login to like"' : ""}>
+                    ${hasLiked ? heartFilled : heartOutline}
+                    ${likeCount > 0 ? `<span class="like-count">${likeCount}</span>` : ""}
+                  </button>
+                ` : likeCount > 0 ? `<span class="like-count-only">${heartFilled} ${likeCount}</span>` : ""}
               </div>
             </div>
           `;
@@ -1170,6 +1245,10 @@ ${lines.join("\n")}
         if (submitBtn) {
           submitBtn.addEventListener("click", () => this.submitComment());
         }
+        const likeBtns = this.shadow.querySelectorAll(".like-btn");
+        likeBtns.forEach((btn) => {
+          btn.addEventListener("click", (e) => this.handleLike(e));
+        });
       } catch (error) {
         this.showError(error instanceof Error ? error.message : "Failed to load comments");
       } finally {
@@ -1209,6 +1288,53 @@ ${lines.join("\n")}
           submitBtn.disabled = false;
           submitBtn.textContent = "Post Comment";
         }
+      }
+    }
+    async handleLike(e) {
+      const btn = e.currentTarget;
+      const postId = btn.dataset.postId;
+      const isLiked = btn.dataset.liked === "true";
+      if (!postId || !this.client) return;
+      btn.disabled = true;
+      try {
+        if (isLiked) {
+          await this.client.unlikePost(BigInt(postId));
+        } else {
+          await this.client.likePost(BigInt(postId));
+        }
+        const heartOutline = `<svg class="heart-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 18.35l-1.45-1.32C3.4 12.36 0 9.28 0 5.5 0 2.42 2.42 0 5.5 0 7.24 0 8.91.81 10 2.09 11.09.81 12.76 0 14.5 0 17.58 0 20 2.42 20 5.5c0 3.78-3.4 6.86-8.55 11.54L10 18.35z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
+        const heartFilled = `<svg class="heart-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 18.35l-1.45-1.32C3.4 12.36 0 9.28 0 5.5 0 2.42 2.42 0 5.5 0 7.24 0 8.91.81 10 2.09 11.09.81 12.76 0 14.5 0 17.58 0 20 2.42 20 5.5c0 3.78-3.4 6.86-8.55 11.54L10 18.35z"/></svg>`;
+        const countSpan = btn.querySelector(".like-count");
+        let currentCount = countSpan ? parseInt(countSpan.textContent || "0") : 0;
+        if (isLiked) {
+          btn.classList.remove("liked");
+          btn.dataset.liked = "false";
+          currentCount = Math.max(0, currentCount - 1);
+          const icon = btn.querySelector(".heart-icon");
+          if (icon) icon.outerHTML = heartOutline;
+        } else {
+          btn.classList.add("liked");
+          btn.dataset.liked = "true";
+          currentCount += 1;
+          const icon = btn.querySelector(".heart-icon");
+          if (icon) icon.outerHTML = heartFilled;
+        }
+        if (currentCount > 0) {
+          if (countSpan) {
+            countSpan.textContent = String(currentCount);
+          } else {
+            const newCountSpan = document.createElement("span");
+            newCountSpan.className = "like-count";
+            newCountSpan.textContent = String(currentCount);
+            btn.appendChild(newCountSpan);
+          }
+        } else if (countSpan) {
+          countSpan.remove();
+        }
+      } catch (error) {
+        console.error("Failed to toggle like:", error);
+      } finally {
+        btn.disabled = false;
       }
     }
     formatRelativeTime(date) {

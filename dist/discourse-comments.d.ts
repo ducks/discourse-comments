@@ -35,6 +35,7 @@ declare class DiscourseComments extends HTMLElement {
     private render;
     private loadComments;
     private submitComment;
+    private handleLike;
     private formatRelativeTime;
     private showError;
 }
