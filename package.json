@@ -1,6 +1,6 @@
 {
   "name": "discourse-comments",
-  "version": "20260113.0.2",
+  "version": "20260113.0.3",
   "description": "WASM-based embedded comment system for Discourse forums",
   "type": "module",
   "main": "dist/discourse-comments.js",
