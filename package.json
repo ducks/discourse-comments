@@ -1,7 +1,7 @@
 {
   "name": "discourse-comments",
   "version": "20260113.0.3",
-  "description": "WASM-based embedded comment system for Discourse forums",
+  "description": "Embedded comment system for Discourse forums",
   "type": "module",
   "main": "dist/discourse-comments.js",
   "types": "dist/index.d.ts",
@@ -13,7 +13,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "discourse-api-rs": "^20260113.0.5"
+    "discourse-api-ts": "^20260227.0.1"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",
@@ -23,7 +23,6 @@
     "discourse",
     "comments",
     "embed",
-    "wasm",
     "web-component"
   ],
   "author": "Jake Goldsborough",

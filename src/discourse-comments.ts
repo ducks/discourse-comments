@@ -1,7 +1,7 @@
 /**
  * Discourse Comments Web Component
  *
- * A WASM-powered embedded comment system for Discourse forums.
+ * An embedded comment system for Discourse forums.
  *
  * Usage:
  *   <discourse-comments
@@ -11,8 +11,7 @@
  *   </discourse-comments>
  */
 
-// @ts-ignore - WASM module types
-import init, { WasmDiscourseClient } from 'discourse-api-rs';
+import { DiscourseClient } from 'discourse-api-ts';
 
 class DiscourseComments extends HTMLElement {
   private shadow: ShadowRoot;
@@ -20,7 +19,7 @@ class DiscourseComments extends HTMLElement {
   private topicId: string = '';
   private clientId: string = 'discourse-comments';
   private userApiKey: string | null = null;
-  private client: WasmDiscourseClient | null = null;
+  private client: DiscourseClient | null = null;
   private isLoading: boolean = false;
 
   constructor() {
@@ -89,38 +88,23 @@ class DiscourseComments extends HTMLElement {
           throw new Error('Missing private key - did you reload the page during OAuth flow?');
         }
 
-        console.log('Found private key, attempting to decrypt payload...');
-        console.log('Payload length:', payload.length);
-        console.log('Payload (first 100 chars):', payload.substring(0, 100));
-        console.log('Private key PEM (first 100 chars):', privateKeyPem.substring(0, 100));
-
         // Import private key
         const privateKey = await this.importPrivateKey(privateKeyPem);
-        console.log('Private key imported successfully');
-        console.log('Private key algorithm:', (privateKey.algorithm as any).name);
-        console.log('Private key hash:', (privateKey.algorithm as any).hash?.name);
 
-        // Decode and decrypt the payload (decrypt FIRST, then parse JSON)
-        // Strip whitespace from base64 (Discourse may include newlines)
+        // Decode and decrypt the payload
         const cleanPayload = payload.replace(/\s/g, '');
-        console.log('Clean payload length:', cleanPayload.length);
         const encryptedData = Uint8Array.from(atob(cleanPayload), c => c.charCodeAt(0));
-        console.log('Encrypted data length:', encryptedData.length);
         const decryptedData = await window.crypto.subtle.decrypt(
           { name: 'RSA-OAEP' },
           privateKey,
           encryptedData
         );
-        console.log('Decryption succeeded!');
         const jsonString = new TextDecoder().decode(decryptedData);
         const data = JSON.parse(jsonString);
 
-        // Extract the API key
         if (!data.key) {
           throw new Error('No API key in decrypted payload');
         }
-
-        console.log('Successfully decrypted API key!');
         this.saveApiKey(data.key);
 
         // Clean up
@@ -185,9 +169,7 @@ class DiscourseComments extends HTMLElement {
       const { publicKey, privateKey } = await this.generateKeyPair();
 
       // Store private key temporarily (use localStorage to survive OAuth redirect)
-      console.log('Storing private key (first 100 chars):', privateKey.substring(0, 100));
       localStorage.setItem('discourse-comments-private-key-temp', privateKey);
-      console.log('Private key stored in localStorage');
 
       const authUrl = new URL('/user-api-key/new', this.discourseUrl);
       const currentUrl = new URL(window.location.href);
@@ -207,14 +189,10 @@ class DiscourseComments extends HTMLElement {
         padding: 'oaep',
       };
 
-      console.log('OAuth params:', params);
-      console.log('Public key (first 100 chars):', publicKey.substring(0, 100));
-
       Object.entries(params).forEach(([key, value]) => {
         authUrl.searchParams.set(key, value);
       });
 
-      console.log('Redirecting to:', authUrl.toString().substring(0, 200) + '...');
       window.location.href = authUrl.toString();
     } catch (error) {
       console.error('Failed to initiate login:', error);
@@ -491,27 +469,21 @@ class DiscourseComments extends HTMLElement {
   }
 
   private async loadComments() {
-    // Prevent concurrent calls (fixes WASM closure recursion error)
+    // Prevent concurrent calls
     if (this.isLoading) {
       return;
     }
     this.isLoading = true;
 
     try {
-      await init();
-
       // Create appropriate client
       if (this.userApiKey) {
-        console.log('Using authenticated client with key:', this.userApiKey.substring(0, 10) + '...');
-        this.client = WasmDiscourseClient.withUserApiKey(this.discourseUrl, this.userApiKey);
+        this.client = DiscourseClient.withUserApiKey(this.discourseUrl, this.userApiKey);
       } else {
-        console.log('Using anonymous client');
-        this.client = new WasmDiscourseClient(this.discourseUrl);
+        this.client = new DiscourseClient(this.discourseUrl);
       }
 
-      console.log('Fetching topic', this.topicId);
-      const topicData = await this.client.getTopic(BigInt(this.topicId));
-      console.log('Topic fetched successfully:', topicData);
+      const topicData = await this.client.getTopic(Number(this.topicId));
 
       const container = this.shadow.querySelector('.comments-container');
       if (!container) return;
@@ -630,7 +602,7 @@ class DiscourseComments extends HTMLElement {
     }
 
     try {
-      await this.client.createPost(BigInt(this.topicId), textarea.value, null);
+      await this.client.createPost(Number(this.topicId), textarea.value);
 
       // Clear textarea and reload comments
       textarea.value = '';
@@ -667,9 +639,9 @@ class DiscourseComments extends HTMLElement {
 
     try {
       if (isLiked) {
-        await this.client.unlikePost(BigInt(postId));
+        await this.client.unlikePost(Number(postId));
       } else {
-        await this.client.likePost(BigInt(postId));
+        await this.client.likePost(Number(postId));
       }
 
       // Update button state
