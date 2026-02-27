@@ -12,6 +12,7 @@
  */
 
 import { DiscourseClient } from 'discourse-api-ts';
+import { formatRelativeTime } from './utils.js';
 
 class DiscourseComments extends HTMLElement {
   private shadow: ShadowRoot;
@@ -516,7 +517,7 @@ class DiscourseComments extends HTMLElement {
       if (topicData.post_stream && topicData.post_stream.posts) {
         for (const post of topicData.post_stream.posts) {
           const date = new Date(post.created_at);
-          const relativeTime = this.formatRelativeTime(date);
+          const relativeTime = formatRelativeTime(date);
 
           // Check if user has liked this post (action_type 2 is "like")
           const likeAction = post.actions_summary?.find((a: any) => a.id === 2);
@@ -688,21 +689,6 @@ class DiscourseComments extends HTMLElement {
     } finally {
       btn.disabled = false;
     }
-  }
-
-  private formatRelativeTime(date: Date): string {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays < 30) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-
-    return date.toLocaleDateString();
   }
 
   private showError(message: string) {
